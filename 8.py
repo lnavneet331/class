@@ -1,0 +1,1 @@
+#print even numbers ranging from 1 to 10
