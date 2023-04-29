@@ -1,0 +1,1 @@
+#using for loop count the sum of numbers ranging from 1 to 10
