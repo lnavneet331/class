@@ -1,0 +1,10 @@
+# Streamlit secrets – never commit this
+portfolio_tracker/.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
