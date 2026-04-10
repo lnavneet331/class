@@ -181,9 +181,12 @@ if auth.get_role() == auth.ROLE_ADMIN:
             if submit:
                 if txn_type in ("BUY", "SELL") and not symbol.strip():
                     st.error("Symbol is required for BUY / SELL transactions.")
+                elif txn_type == "WITHDRAW" and amount > 0:
+                    st.error(
+                        "Amount must be **negative** for WITHDRAW transactions "
+                        f"(e.g. enter −{abs(amount):,.0f} to withdraw {CURRENCY}{abs(amount):,.0f})."
+                    )
                 else:
-                    if txn_type == "WITHDRAW" and amount > 0:
-                        amount = -amount   # ensure negative
                     ok = sm.append_transaction(
                         txn_date, txn_type, symbol, quantity, price, amount, notes
                     )

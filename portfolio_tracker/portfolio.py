@@ -176,7 +176,6 @@ def _portfolio_daily_value(df: pd.DataFrame, end_date: date | None = None) -> pd
     Uses end-of-day prices for all held symbols.
     """
     end_date = end_date or date.today()
-    start_date = end_date - timedelta(days=365)
 
     symbols = df[df["Type"] == "BUY"]["Symbol"].unique().tolist()
     if not symbols:
@@ -185,7 +184,7 @@ def _portfolio_daily_value(df: pd.DataFrame, end_date: date | None = None) -> pd
     try:
         hist = yf.download(
             symbols + [BENCHMARK_SYMBOL],
-            start=start_date, end=end_date + timedelta(days=1),
+            period=CHART_PERIOD,
             progress=False, auto_adjust=True,
         )
         if isinstance(hist.columns, pd.MultiIndex):

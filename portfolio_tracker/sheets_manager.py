@@ -132,8 +132,8 @@ def append_transaction(
             ],
             value_input_option="USER_ENTERED",
         )
-        # Clear the cached client so next load_transactions fetches fresh data
-        _get_client.clear()
+        # Clear the data cache so next load_transactions fetches fresh rows
+        st.cache_data.clear()
         return True
     except Exception:
         return False
