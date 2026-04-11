@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 import urllib.request
 from datetime import date
 from typing import Any
@@ -17,7 +16,6 @@ from config import (
     PORTFOLIO_SHEET_KEY,
     PORTFOLIO_SHEET_NAME,
     TRANSACTIONS_WORKSHEET,
-    COL_DATE, COL_TYPE, COL_SYMBOL, COL_QTY, COL_PRICE, COL_AMOUNT, COL_NOTES,
 )
 
 SCOPES = [
@@ -47,21 +45,17 @@ def _get_worksheet() -> gspread.Worksheet | None:
     if client is None:
         return None
     try:
-        # Open by key (sheet ID) for reliability
         try:
             sh = client.open_by_key(PORTFOLIO_SHEET_KEY)
         except Exception:
             sh = client.open(PORTFOLIO_SHEET_NAME)
-        try:
-            ws = sh.worksheet(TRANSACTIONS_WORKSHEET)
-        except gspread.WorksheetNotFound:
-            ws = sh.add_worksheet(
-                title=TRANSACTIONS_WORKSHEET, rows="1000", cols="7"
-            )
-            ws.append_row(
-                ["Date", "Type", "Symbol", "Quantity", "Price", "Amount", "Notes"],
-                value_input_option="USER_ENTERED",
-            )
+        if TRANSACTIONS_WORKSHEET:
+            try:
+                ws = sh.worksheet(TRANSACTIONS_WORKSHEET)
+            except gspread.WorksheetNotFound:
+                ws = sh.get_worksheet(0)
+        else:
+            ws = sh.get_worksheet(0)
         return ws
     except Exception:
         return None
@@ -69,15 +63,17 @@ def _get_worksheet() -> gspread.Worksheet | None:
 
 def _read_public_sheet() -> list[list[Any]] | None:
     """
-    Read the Transactions tab from the Google Sheet via its public CSV export URL.
+    Read from the Google Sheet via its public CSV export URL.
     Works for sheets shared as 'Anyone with the link can view'.
+    Reads the first visible tab when no worksheet name is configured.
     Returns a list-of-lists (header row first), or None on failure.
     """
     try:
-        url = (
-            f"https://docs.google.com/spreadsheets/d/{PORTFOLIO_SHEET_KEY}"
-            f"/gviz/tq?tqx=out:csv&sheet={TRANSACTIONS_WORKSHEET}"
-        )
+        base = f"https://docs.google.com/spreadsheets/d/{PORTFOLIO_SHEET_KEY}/gviz/tq?tqx=out:csv"
+        if TRANSACTIONS_WORKSHEET:
+            url = f"{base}&sheet={TRANSACTIONS_WORKSHEET}"
+        else:
+            url = base
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15) as resp:
             content = resp.read().decode("utf-8")
@@ -92,22 +88,25 @@ def _read_public_sheet() -> list[list[Any]] | None:
 # Sample data (fallback when neither gspread nor public read is available)
 # ---------------------------------------------------------------------------
 
+# Google Finance export format: matches the actual sheet structure
 SAMPLE_TRANSACTIONS: list[list[Any]] = [
-    ["Date",       "Type",     "Symbol",       "Quantity", "Price",  "Amount",   "Notes"],
-    ["2023-01-05", "DEPOSIT",  "",             0,          0,        500000,     "Initial deposit"],
-    ["2023-01-10", "BUY",      "RELIANCE.NS",  10,         2400,     24000,      ""],
-    ["2023-01-10", "BUY",      "TCS.NS",       5,          3200,     16000,      ""],
-    ["2023-02-01", "BUY",      "HDFCBANK.NS",  20,         1650,     33000,      ""],
-    ["2023-03-15", "BUY",      "NIFTYBEES.NS", 100,        185,      18500,      "Nifty ETF"],
-    ["2023-04-20", "BUY",      "INFY.NS",      15,         1400,     21000,      ""],
-    ["2023-06-10", "SELL",     "TCS.NS",       2,          3500,     7000,       "Partial profit booking"],
-    ["2023-07-01", "DEPOSIT",  "",             0,          0,        100000,     "Monthly addition"],
-    ["2023-08-05", "BUY",      "ITC.NS",       50,         420,      21000,      ""],
-    ["2023-09-20", "BUY",      "BAJFINANCE.NS",3,          7200,     21600,      ""],
-    ["2024-01-15", "BUY",      "WIPRO.NS",     30,         480,      14400,      ""],
-    ["2024-03-01", "SELL",     "RELIANCE.NS",  5,          2900,     14500,      "Profit booking"],
-    ["2024-04-10", "WITHDRAW", "",             0,          0,        -50000,     "Partial withdrawal"],
-    ["2024-06-01", "BUY",      "TATAMOTORS.NS",20,         950,      19000,      ""],
+    ["Symbol", "Current Price", "Date", "Time", "Change", "Open", "High", "Low",
+     "Volume", "Trade Date", "Purchase Price", "Quantity", "Commission",
+     "High Limit", "Low Limit", "Comment", "Transaction Type"],
+    ["$$CASH_TX", "", "", "", "", "", "", "", "", "20260410", "", "5000", "", "", "", "", "DEPOSIT"],
+    ["$$CASH_TX", "", "", "", "", "", "", "", "", "20260210", "", "83690", "", "", "", "", "DEPOSIT"],
+    ["HDFCBANK.NS", "", "", "", "", "", "", "", "", "20260330", "744.85", "10", "9", "", "", "", "BUY"],
+    ["NIFTYBEES.NS", "", "", "", "", "", "", "", "", "20260313", "263.25", "25", "2", "", "", "", "BUY"],
+    ["NIFTYBEES.NS", "", "", "", "", "", "", "", "", "20260309", "269.33", "25", "2", "", "", "", "BUY"],
+    ["INFY.NS", "", "", "", "", "", "", "", "", "20260216", "1340.9", "4", "15", "", "", "", "BUY"],
+    ["ADANIENT.NS", "", "", "", "", "", "", "", "", "20260123", "1905", "5", "", "", "", "", "BUY"],
+    ["KALYANKJIL.NS", "", "", "", "", "", "", "", "", "20260123", "370", "40", "", "", "", "", "BUY"],
+    ["KALYANKJIL.NS", "", "", "", "", "", "", "", "", "20260209", "437.35", "40", "40", "", "", "", "SELL"],
+    ["TATACAP.NS", "", "", "", "", "", "", "", "", "20260129", "331.5", "20", "", "", "", "", "BUY"],
+    ["WIPRO.NS", "", "", "", "", "", "", "", "", "20260212", "220", "23", "", "", "", "", "BUY"],
+    ["WIPRO.NS", "", "", "", "", "", "", "", "", "20260210", "233.47", "21", "", "", "", "", "BUY"],
+    ["GOLDBEES.NS", "", "", "", "", "", "", "", "", "20260130", "138.68", "72", "", "", "", "", "BUY"],
+    ["GOLDBEES.NS", "", "", "", "", "", "", "", "", "20260410", "123.68", "72", "8", "", "", "", "BUY"],
 ]
 
 # ---------------------------------------------------------------------------
@@ -120,7 +119,7 @@ def is_sheets_connected() -> bool:
 
 def load_transactions() -> list[list[Any]]:
     """
-    Returns all rows from the Transactions sheet (including header).
+    Returns all rows from the sheet (including header).
 
     Priority:
       1. Authenticated gspread (read + write)
@@ -130,13 +129,8 @@ def load_transactions() -> list[list[Any]]:
     ws = _get_worksheet()
     if ws is not None:
         rows = ws.get_all_values()
-        if not rows:
-            ws.append_row(
-                ["Date", "Type", "Symbol", "Quantity", "Price", "Amount", "Notes"],
-                value_input_option="USER_ENTERED",
-            )
-            return [["Date", "Type", "Symbol", "Quantity", "Price", "Amount", "Notes"]]
-        return rows
+        if rows:
+            return rows
 
     # No auth — try reading the sheet publicly
     rows = _read_public_sheet()
@@ -162,17 +156,26 @@ def append_transaction(
     try:
         ws.append_row(
             [
-                txn_date.strftime("%Y-%m-%d"),
-                txn_type.upper(),
-                symbol.upper().strip(),
-                quantity,
-                price,
-                amount,
-                notes,
+                "",                         # Symbol
+                "",                         # Current Price
+                "",                         # Date
+                "",                         # Time
+                "",                         # Change
+                "",                         # Open
+                "",                         # High
+                "",                         # Low
+                "",                         # Volume
+                txn_date.strftime("%Y%m%d"),  # Trade Date (YYYYMMDD)
+                price if txn_type.upper() in ("BUY", "SELL") else "",  # Purchase Price
+                quantity if txn_type.upper() in ("BUY", "SELL") else amount,  # Quantity / Amount
+                "",                         # Commission
+                "",                         # High Limit
+                "",                         # Low Limit
+                notes,                      # Comment
+                txn_type.upper(),           # Transaction Type
             ],
             value_input_option="USER_ENTERED",
         )
-        # Clear the data cache so next load_transactions fetches fresh rows
         st.cache_data.clear()
         return True
     except Exception:

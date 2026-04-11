@@ -26,11 +26,89 @@ warnings.filterwarnings("ignore")
 # Transaction parsing
 # ──────────────────────────────────────────────────────────────────────────────
 
-def parse_transactions(raw_rows: list[list[Any]]) -> pd.DataFrame:
-    """Convert the raw sheet rows (with header) into a clean DataFrame."""
-    if len(raw_rows) < 2:
+def _to_float(val: Any) -> float:
+    """Safely convert a value to float, returning 0.0 on failure."""
+    try:
+        return float(str(val).replace(",", "").strip())
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _parse_google_finance_format(raw_rows: list[list[Any]], header: list[str]) -> pd.DataFrame:
+    """
+    Parse Google Finance portfolio export format.
+
+    Expected columns (detected by header):
+      Symbol | Current Price | Date | Time | Change | Open | High | Low |
+      Volume | Trade Date | Purchase Price | Quantity | Commission |
+      High Limit | Low Limit | Comment | Transaction Type
+
+    Cash rows use Symbol=$$CASH_TX with the deposit/withdrawal amount in Quantity.
+    Dates are in YYYYMMDD format.
+    """
+    col = {name: idx for idx, name in enumerate(header)}
+
+    sym_col   = col.get("Symbol", 0)
+    date_col  = col.get("Trade Date", 9)
+    price_col = col.get("Purchase Price", 10)
+    qty_col   = col.get("Quantity", 11)
+    comm_col  = col.get("Commission", 12)
+    note_col  = col.get("Comment", 15)
+    type_col  = col.get("Transaction Type", 16)
+
+    records = []
+    for row in raw_rows[1:]:
+        if len(row) <= max(sym_col, date_col, type_col):
+            continue
+
+        symbol   = str(row[sym_col]).strip()   if len(row) > sym_col   else ""
+        raw_date = str(row[date_col]).strip()   if len(row) > date_col  else ""
+        txn_type = str(row[type_col]).strip().upper() if len(row) > type_col else ""
+
+        if not txn_type or not raw_date:
+            continue
+
+        # Parse date: support YYYYMMDD and YYYY-MM-DD
+        parsed_date = pd.to_datetime(raw_date, format="%Y%m%d", errors="coerce")
+        if pd.isna(parsed_date):
+            parsed_date = pd.to_datetime(raw_date, errors="coerce")
+        if pd.isna(parsed_date):
+            continue
+
+        qty        = _to_float(row[qty_col])  if len(row) > qty_col   else 0.0
+        price      = _to_float(row[price_col]) if len(row) > price_col else 0.0
+        commission = _to_float(row[comm_col])  if len(row) > comm_col  else 0.0
+        notes      = str(row[note_col]).strip() if len(row) > note_col  else ""
+
+        if symbol == "$$CASH_TX":
+            # Cash deposit / withdrawal: amount is in the Quantity column
+            records.append({
+                "Date": parsed_date, "Type": txn_type,
+                "Symbol": "", "Quantity": 0, "Price": 0,
+                "Amount": qty, "Notes": notes,
+            })
+        else:
+            # Stock / ETF / crypto buy or sell
+            total_amount = qty * price + commission
+            records.append({
+                "Date": parsed_date, "Type": txn_type,
+                "Symbol": symbol.upper(), "Quantity": qty, "Price": price,
+                "Amount": total_amount, "Notes": notes,
+            })
+
+    if not records:
         return pd.DataFrame()
 
+    df = pd.DataFrame(records)
+    df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+    return df
+
+
+def _parse_legacy_format(raw_rows: list[list[Any]]) -> pd.DataFrame:
+    """
+    Parse the legacy app format:
+      Date | Type | Symbol | Quantity | Price | Amount | Notes
+    """
     df = pd.DataFrame(raw_rows[1:], columns=["Date", "Type", "Symbol",
                                                "Quantity", "Price", "Amount", "Notes"])
     df["Date"]     = pd.to_datetime(df["Date"], errors="coerce")
@@ -41,6 +119,25 @@ def parse_transactions(raw_rows: list[list[Any]]) -> pd.DataFrame:
     df["Symbol"]   = df["Symbol"].str.upper().str.strip()
     df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
     return df
+
+
+def parse_transactions(raw_rows: list[list[Any]]) -> pd.DataFrame:
+    """
+    Convert raw sheet rows (with header) into a clean DataFrame.
+
+    Auto-detects the sheet format:
+    - Google Finance export (header contains 'Trade Date' or 'Transaction Type')
+    - Legacy app format (header starts with 'Date', 'Type', 'Symbol', ...)
+    """
+    if len(raw_rows) < 2:
+        return pd.DataFrame()
+
+    header = [str(h).strip() for h in raw_rows[0]]
+
+    if "Trade Date" in header or "Transaction Type" in header:
+        return _parse_google_finance_format(raw_rows, header)
+
+    return _parse_legacy_format(raw_rows)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
