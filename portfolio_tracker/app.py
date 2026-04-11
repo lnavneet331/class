@@ -2,10 +2,22 @@
 Portfolio Tracker – main Streamlit entry point.
 
 Run with:
-    streamlit run app.py
+    streamlit run portfolio_tracker/app.py        (from repo root)
+    streamlit run app.py                          (from portfolio_tracker/)
+    streamlit run streamlit_app.py                (from repo root via root entry-point)
 """
 
 from __future__ import annotations
+
+import os
+import sys
+
+# Ensure portfolio_tracker's own directory is on the path so peer modules
+# (auth, config, portfolio, sheets_manager) are importable regardless of the
+# working directory Streamlit is launched from.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
 
 from datetime import date, timedelta
 

@@ -11,17 +11,32 @@ ROLE_ADMIN  = "admin"
 ROLE_VIEWER = "viewer"
 
 # ---------------------------------------------------------------------------
+# Demo / fallback credentials
+# These are shown on the login page when secrets.toml is not configured.
+# Anyone can log in with these in demo mode.
+# ---------------------------------------------------------------------------
+_DEMO_USERS = {
+    "admin": {
+        "password":     "admin123",
+        "role":         ROLE_ADMIN,
+        "display_name": "Portfolio Manager (Demo)",
+    },
+    "father": {
+        "password":     "father123",
+        "role":         ROLE_VIEWER,
+        "display_name": "Dad's Portfolio (Demo)",
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _get_users() -> dict | None:
+def _get_users() -> tuple[dict, bool]:
     """
-    Returns {username: {"password": ..., "role": ..., "display_name": ...}},
-    or None if credentials are not configured in secrets.toml.
+    Returns (users_dict, is_demo).
 
-    Passwords are stored in plaintext in secrets.toml and compared using
-    hmac.compare_digest (constant-time) at login time — they are never
-    persisted or hashed to disk.
+    Reads from st.secrets["users"] when available; falls back to _DEMO_USERS.
 
     secrets.toml format:
 
@@ -44,9 +59,11 @@ def _get_users() -> dict | None:
                 "role":         udata.get("role", ROLE_VIEWER),
                 "display_name": udata.get("display_name", uname.title()),
             }
-        return users if users else None
+        if users:
+            return users, False
     except Exception:
-        return None
+        pass
+    return _DEMO_USERS, True
 
 
 # ---------------------------------------------------------------------------
@@ -67,9 +84,7 @@ def get_display_name() -> str:
 
 def login(username: str, password: str) -> bool:
     """Validate credentials and populate session state. Returns True on success."""
-    users = _get_users()
-    if users is None:
-        return False
+    users, _ = _get_users()
     uname = username.strip().lower()
     if uname in users and hmac.compare_digest(password, users[uname]["password"]):
         st.session_state["authenticated"] = True
@@ -86,25 +101,29 @@ def logout():
 
 
 def render_login_page():
-    """Renders the login form (or a setup warning). Returns nothing."""
+    """Renders the login form with demo credentials banner when in demo mode."""
+    _, is_demo = _get_users()
+
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("## 📈 Portfolio Tracker")
         st.markdown("---")
 
-        if _get_users() is None:
-            st.warning(
-                "⚠️ **Credentials not configured.**\n\n"
-                "Copy `.streamlit/secrets.toml.example` → `.streamlit/secrets.toml`, "
-                "set your passwords, and restart the app.\n\n"
-                "See `README.md` for full setup instructions."
+        if is_demo:
+            st.info(
+                "**🎮 Demo Mode** — no secrets.toml detected.\n\n"
+                "Use the credentials below to explore the app with sample data:\n\n"
+                "| Username | Password | Role |\n"
+                "|---|---|---|\n"
+                "| `admin` | `admin123` | Full access + add transactions |\n"
+                "| `father` | `father123` | Read-only dashboard |\n\n"
+                "_To use your own data, configure `secrets.toml` — see README._"
             )
-            st.stop()
 
         with st.form("login_form"):
             username = st.text_input("Username", placeholder="admin or father")
             password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Login", use_container_width=True)
+            submitted = st.form_submit_button("🔐 Login", use_container_width=True)
             if submitted:
                 if login(username, password):
                     st.success(f"Welcome, {get_display_name()}!")
