@@ -73,7 +73,7 @@ with st.sidebar:
     if connected:
         st.success("🟢 Google Sheets connected")
     else:
-        st.warning("🟡 Demo mode – sample data")
+        st.warning("🟡 Read-only – Google Sheets write access not configured")
 
     st.markdown("---")
     st.caption("Portfolio Tracker v1.0")
@@ -125,7 +125,7 @@ def _delta_color(val: float | None) -> str:
 
 st.title("📈 Portfolio Dashboard")
 if not sm.is_sheets_connected():
-    st.info("ℹ️ Running in **demo mode** with sample data. Configure Google Sheets to use live data.")
+    st.info("ℹ️ Read-only mode — Google Sheets write access not configured. Transactions are loaded from the sheet but cannot be added here.")
 
 st.markdown("---")
 

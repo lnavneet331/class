@@ -11,20 +11,18 @@ ROLE_ADMIN  = "admin"
 ROLE_VIEWER = "viewer"
 
 # ---------------------------------------------------------------------------
-# Demo / fallback credentials
-# These are shown on the login page when secrets.toml is not configured.
-# Anyone can log in with these in demo mode.
+# Default credentials (used when secrets.toml is not configured)
 # ---------------------------------------------------------------------------
-_DEMO_USERS = {
+_DEFAULT_USERS = {
     "admin": {
-        "password":     "admin123",
+        "password":     "admin",
         "role":         ROLE_ADMIN,
-        "display_name": "Portfolio Manager (Demo)",
+        "display_name": "Portfolio Manager",
     },
-    "father": {
-        "password":     "father123",
+    "user": {
+        "password":     "user",
         "role":         ROLE_VIEWER,
-        "display_name": "Dad's Portfolio (Demo)",
+        "display_name": "Portfolio Viewer",
     },
 }
 
@@ -32,11 +30,11 @@ _DEMO_USERS = {
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _get_users() -> tuple[dict, bool]:
+def _get_users() -> dict:
     """
-    Returns (users_dict, is_demo).
+    Returns {username: {"password": ..., "role": ..., "display_name": ...}}.
 
-    Reads from st.secrets["users"] when available; falls back to _DEMO_USERS.
+    Reads from st.secrets["users"] when available; falls back to _DEFAULT_USERS.
 
     secrets.toml format:
 
@@ -45,10 +43,10 @@ def _get_users() -> tuple[dict, bool]:
         role         = "admin"
         display_name = "Portfolio Manager"
 
-        [users.father]
-        password     = "fathers_password"
+        [users.user]
+        password     = "your_user_password"
         role         = "viewer"
-        display_name = "Dad's Portfolio"
+        display_name = "Portfolio Viewer"
     """
     try:
         raw = st.secrets["users"]
@@ -60,10 +58,10 @@ def _get_users() -> tuple[dict, bool]:
                 "display_name": udata.get("display_name", uname.title()),
             }
         if users:
-            return users, False
+            return users
     except Exception:
         pass
-    return _DEMO_USERS, True
+    return _DEFAULT_USERS
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +82,7 @@ def get_display_name() -> str:
 
 def login(username: str, password: str) -> bool:
     """Validate credentials and populate session state. Returns True on success."""
-    users, _ = _get_users()
+    users = _get_users()
     uname = username.strip().lower()
     if uname in users and hmac.compare_digest(password, users[uname]["password"]):
         st.session_state["authenticated"] = True
@@ -101,27 +99,14 @@ def logout():
 
 
 def render_login_page():
-    """Renders the login form with demo credentials banner when in demo mode."""
-    _, is_demo = _get_users()
-
+    """Renders the login form."""
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("## 📈 Portfolio Tracker")
         st.markdown("---")
 
-        if is_demo:
-            st.info(
-                "**🎮 Demo Mode** — no secrets.toml detected.\n\n"
-                "Use the credentials below to explore the app with sample data:\n\n"
-                "| Username | Password | Role |\n"
-                "|---|---|---|\n"
-                "| `admin` | `admin123` | Full access + add transactions |\n"
-                "| `father` | `father123` | Read-only dashboard |\n\n"
-                "_To use your own data, configure `secrets.toml` — see README._"
-            )
-
         with st.form("login_form"):
-            username = st.text_input("Username", placeholder="admin or father")
+            username = st.text_input("Username", placeholder="admin or user")
             password = st.text_input("Password", type="password")
             submitted = st.form_submit_button("🔐 Login", use_container_width=True)
             if submitted:

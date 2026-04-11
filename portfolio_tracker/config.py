@@ -1,7 +1,8 @@
 # ── Portfolio Tracker – Configuration ──────────────────────────────────────────
 
 # Google Sheets
-PORTFOLIO_SHEET_NAME = "Portfolio Tracker"      # Name of the Google Spreadsheet
+PORTFOLIO_SHEET_KEY  = "1sZEIJS-k5ukXNQHVfpaAqbx0cB-Ie5O7n0YB59uSSLo"  # Sheet ID from URL
+PORTFOLIO_SHEET_NAME = "Portfolio Tracker"      # Fallback: open by name
 TRANSACTIONS_WORKSHEET = "Transactions"          # Tab that holds all transactions
 
 # Benchmark

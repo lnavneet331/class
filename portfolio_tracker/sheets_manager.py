@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
+import urllib.request
 from datetime import date
 from typing import Any
 
@@ -11,6 +14,7 @@ import streamlit as st
 from google.oauth2.service_account import Credentials
 
 from config import (
+    PORTFOLIO_SHEET_KEY,
     PORTFOLIO_SHEET_NAME,
     TRANSACTIONS_WORKSHEET,
     COL_DATE, COL_TYPE, COL_SYMBOL, COL_QTY, COL_PRICE, COL_AMOUNT, COL_NOTES,
@@ -43,7 +47,11 @@ def _get_worksheet() -> gspread.Worksheet | None:
     if client is None:
         return None
     try:
-        sh = client.open(PORTFOLIO_SHEET_NAME)
+        # Open by key (sheet ID) for reliability
+        try:
+            sh = client.open_by_key(PORTFOLIO_SHEET_KEY)
+        except Exception:
+            sh = client.open(PORTFOLIO_SHEET_NAME)
         try:
             ws = sh.worksheet(TRANSACTIONS_WORKSHEET)
         except gspread.WorksheetNotFound:
@@ -59,8 +67,29 @@ def _get_worksheet() -> gspread.Worksheet | None:
         return None
 
 
+def _read_public_sheet() -> list[list[Any]] | None:
+    """
+    Read the Transactions tab from the Google Sheet via its public CSV export URL.
+    Works for sheets shared as 'Anyone with the link can view'.
+    Returns a list-of-lists (header row first), or None on failure.
+    """
+    try:
+        url = (
+            f"https://docs.google.com/spreadsheets/d/{PORTFOLIO_SHEET_KEY}"
+            f"/gviz/tq?tqx=out:csv&sheet={TRANSACTIONS_WORKSHEET}"
+        )
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content = resp.read().decode("utf-8")
+        reader = csv.reader(io.StringIO(content))
+        rows = [row for row in reader if any(cell.strip() for cell in row)]
+        return rows if rows else None
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
-# Sample data (used when Google Sheets is not configured)
+# Sample data (fallback when neither gspread nor public read is available)
 # ---------------------------------------------------------------------------
 
 SAMPLE_TRANSACTIONS: list[list[Any]] = [
@@ -90,20 +119,31 @@ def is_sheets_connected() -> bool:
 
 
 def load_transactions() -> list[list[Any]]:
-    """Returns all rows from the Transactions sheet (including header)."""
-    ws = _get_worksheet()
-    if ws is None:
-        return SAMPLE_TRANSACTIONS
+    """
+    Returns all rows from the Transactions sheet (including header).
 
-    rows = ws.get_all_values()
-    if not rows:
-        # Sheet exists but is empty – write header
-        ws.append_row(
-            ["Date", "Type", "Symbol", "Quantity", "Price", "Amount", "Notes"],
-            value_input_option="USER_ENTERED",
-        )
-        return [["Date", "Type", "Symbol", "Quantity", "Price", "Amount", "Notes"]]
-    return rows
+    Priority:
+      1. Authenticated gspread (read + write)
+      2. Public HTTP read from the hardcoded sheet key (read-only)
+      3. Built-in sample data
+    """
+    ws = _get_worksheet()
+    if ws is not None:
+        rows = ws.get_all_values()
+        if not rows:
+            ws.append_row(
+                ["Date", "Type", "Symbol", "Quantity", "Price", "Amount", "Notes"],
+                value_input_option="USER_ENTERED",
+            )
+            return [["Date", "Type", "Symbol", "Quantity", "Price", "Amount", "Notes"]]
+        return rows
+
+    # No auth — try reading the sheet publicly
+    rows = _read_public_sheet()
+    if rows:
+        return rows
+
+    return SAMPLE_TRANSACTIONS
 
 
 def append_transaction(

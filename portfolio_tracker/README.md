@@ -6,25 +6,16 @@ A **Streamlit** web app for tracking a stock & ETF portfolio with two user roles
 
 ---
 
-## 🚀 Try it instantly — no setup required
-
-The app ships with **demo mode**: if no `secrets.toml` is configured, it uses built-in sample data and shows you the login credentials right on the login page.
-
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `admin123` | Full access – add transactions, view all KPIs |
-| `father` | `father123` | Read-only portfolio dashboard |
-
----
-
 ## Deploy to Streamlit Community Cloud (one-click)
 
 1. Click the **Deploy to Streamlit** badge above, or go to <https://share.streamlit.io>.
 2. Connect your GitHub account and select this repo (`lnavneet331/class`).
 3. Set **Main file path** to `streamlit_app.py` (repo root).
-4. Click **Deploy** — the app runs in demo mode immediately.
+4. Click **Deploy** — the app is live in ~1 minute.
 
-### (Optional) Connect your real Google Sheet
+The app automatically reads from the configured Google Sheet. No additional setup is required to start viewing the portfolio.
+
+### Connect your Google Sheet (for write access / custom credentials)
 
 In the Streamlit Cloud app → **Settings → Secrets**, paste:
 
@@ -34,10 +25,10 @@ password     = "your_strong_admin_password"
 role         = "admin"
 display_name = "Portfolio Manager"
 
-[users.father]
-password     = "your_strong_father_password"
+[users.user]
+password     = "your_strong_user_password"
 role         = "viewer"
-display_name = "Dad's Portfolio"
+display_name = "Portfolio Viewer"
 
 [gcp_service_account]
 type                        = "service_account"
@@ -52,7 +43,7 @@ auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
 client_x509_cert_url        = "https://www.googleapis.com/robot/v1/metadata/x509/your-sa%40your-project.iam.gserviceaccount.com"
 ```
 
-Then create a Google Spreadsheet named **`Portfolio Tracker`** and share it with the service-account email (Editor role). The app auto-creates the `Transactions` tab.
+Share the Google Sheet with the service-account email (Editor role) to enable adding transactions from the app.
 
 ---
 
@@ -60,14 +51,14 @@ Then create a Google Spreadsheet named **`Portfolio Tracker`** and share it with
 
 | Feature | Details |
 |---|---|
-| **Two-role login** | `admin` – full access + add transactions · `father` – read-only dashboard |
+| **Two-role login** | `admin` – full access + add transactions · `user` – read-only dashboard |
 | **Live prices** | Yahoo Finance via `yfinance` (NSE `.NS`, BSE `.BO`, ETFs) |
 | **KPIs** | Unrealized P&L · Realized P&L · Portfolio Return · Portfolio Beta · Weighted Avg P/E · Alpha vs Nifty 50 |
 | **Per-stock fundamentals** | Beta · P/E · Forward P/E · P/B · EPS · ROE · Div Yield · 52-week range |
 | **Benchmark comparison** | Nifty 50 (`^NSEI`) – chart + alpha |
 | **Charts** | Asset allocation pie · Sector breakdown bar · Benchmark % return line |
 | **Google Sheets backend** | Transactions sheet read/write via `gspread` |
-| **Demo mode** | Works with built-in sample data when Sheets isn't configured |
+| **Google Sheets backend** | Transactions sheet read/write via `gspread`; public read works without auth |
 
 ---
 
