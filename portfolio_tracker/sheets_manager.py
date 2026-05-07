@@ -6,6 +6,8 @@ import csv
 import io
 import logging
 import re
+import time
+import urllib.parse
 import urllib.request
 from datetime import date
 from typing import Any
@@ -67,18 +69,46 @@ def _extract_sheet_key(value: str) -> str | None:
     return None
 
 
-def _get_sheet_key() -> str:
-    """Get sheet key from secrets first, then fall back to config constant."""
+def _extract_sheet_gid(value: str) -> str | None:
+    """Extract Google Sheet gid (tab id) from a full URL, if present."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    m = re.search(r"[?&]gid=(\d+)", raw)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _get_sheet_secret_value() -> str | None:
+    """Get the first available sheet secret value."""
     for secret_key in _SHEET_URL_SECRET_KEYS:
         try:
             if secret_key in st.secrets:
-                extracted = _extract_sheet_key(str(st.secrets[secret_key]))
-                if extracted:
-                    return extracted
-                logger.warning("Invalid Google Sheet URL/key in secrets; falling back to config key.")
+                return str(st.secrets[secret_key])
         except Exception:
             continue
+    return None
+
+
+def _get_sheet_key() -> str:
+    """Get sheet key from secrets first, then fall back to config constant."""
+    secret_value = _get_sheet_secret_value()
+    if secret_value is not None:
+        extracted = _extract_sheet_key(secret_value)
+        if extracted:
+            return extracted
+        logger.warning("Invalid Google Sheet URL/key in secrets; falling back to config key.")
     return PORTFOLIO_SHEET_KEY
+
+
+def _get_sheet_gid() -> str | None:
+    """Get sheet gid from secrets URL (if provided)."""
+    secret_value = _get_sheet_secret_value()
+    if not secret_value:
+        return None
+    return _extract_sheet_gid(secret_value)
 
 
 def _get_worksheet() -> gspread.Worksheet | None:
@@ -118,10 +148,22 @@ def _read_public_sheet() -> list[list[Any]] | None:
             return None
         base = f"https://docs.google.com/spreadsheets/d/{sheet_key}/gviz/tq?tqx=out:csv"
         if TRANSACTIONS_WORKSHEET:
-            url = f"{base}&sheet={TRANSACTIONS_WORKSHEET}"
+            sheet_name = urllib.parse.quote_plus(TRANSACTIONS_WORKSHEET)
+            url = f"{base}&sheet={sheet_name}"
+        elif (gid := _get_sheet_gid()):
+            url = f"{base}&gid={gid}"
         else:
             url = base
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        cache_bust = int(time.time() * 1000)
+        url = f"{url}&_cb={cache_bust}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
+        )
         with urllib.request.urlopen(req, timeout=15) as resp:
             content = resp.read().decode("utf-8")
         reader = csv.reader(io.StringIO(content))
