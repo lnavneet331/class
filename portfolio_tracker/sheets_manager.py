@@ -32,6 +32,7 @@ _SHEET_URL_SECRET_KEYS = (
     "portfolio_sheet_key",
     "PORTFOLIO_SHEET_KEY",
 )
+_MIN_SHEET_KEY_LENGTH = 20
 
 # ---------------------------------------------------------------------------
 # Connection helpers
@@ -60,7 +61,7 @@ def _extract_sheet_key(value: str) -> str | None:
     if m:
         return m.group(1)
 
-    if re.fullmatch(r"[a-zA-Z0-9-_]{20,}", raw):
+    if re.fullmatch(rf"[a-zA-Z0-9-_]{{{_MIN_SHEET_KEY_LENGTH},}}", raw):
         return raw
 
     return None
@@ -74,10 +75,7 @@ def _get_sheet_key() -> str:
                 extracted = _extract_sheet_key(str(st.secrets[secret_key]))
                 if extracted:
                     return extracted
-                logger.warning(
-                    "Invalid Google Sheet value in st.secrets['%s']; falling back to config key.",
-                    secret_key,
-                )
+                logger.warning("Invalid Google Sheet URL/key in secrets; falling back to config key.")
         except Exception:
             continue
     return PORTFOLIO_SHEET_KEY
