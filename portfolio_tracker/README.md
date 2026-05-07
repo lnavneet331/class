@@ -30,6 +30,8 @@ password     = "your_strong_user_password"
 role         = "viewer"
 display_name = "Portfolio Viewer"
 
+portfolio_sheet_url = "https://docs.google.com/spreadsheets/d/your_sheet_id/edit?gid=0#gid=0"
+
 [gcp_service_account]
 type                        = "service_account"
 project_id                  = "your-project-id"
@@ -128,6 +130,6 @@ streamlit run app.py
 
 - **Benchmark**: Change `BENCHMARK_SYMBOL` in `config.py` (e.g. `^BSESN` for Sensex).
 - **Sheet name**: Change `PORTFOLIO_SHEET_NAME` in `config.py`.
+- **Sheet URL via secrets**: Set `portfolio_sheet_url` in Streamlit secrets (takes precedence over `PORTFOLIO_SHEET_KEY`).
 - **Chart period**: Change `CHART_PERIOD` in `config.py` (e.g. `"6mo"`, `"2y"`).
 - **Add users**: Add new `[users.username]` blocks in Streamlit Cloud secrets or `secrets.toml`.
-

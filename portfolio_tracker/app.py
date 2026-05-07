@@ -9,6 +9,7 @@ Run with:
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 
@@ -31,6 +32,8 @@ import auth
 import sheets_manager as sm
 from config import CURRENCY, TRANSACTION_TYPES, BENCHMARK_NAME
 from portfolio import build_portfolio
+
+logger = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Page configuration
@@ -62,6 +65,14 @@ with st.sidebar:
 
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
+        try:
+            rows = sm.load_transactions()
+            if rows:
+                logger.info("Reload successful: loaded %d row(s).", len(rows))
+            else:
+                logger.warning("Reload failed: load_transactions returned no rows.")
+        except Exception as exc:
+            logger.exception("Reload failed with exception: %s", exc)
         st.rerun()
 
     if st.button("🚪 Logout", use_container_width=True):

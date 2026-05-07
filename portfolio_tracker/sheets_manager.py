@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
+import re
 import urllib.request
 from datetime import date
 from typing import Any
@@ -22,6 +24,14 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
+logger = logging.getLogger(__name__)
+
+_SHEET_URL_SECRET_KEYS = (
+    "portfolio_sheet_url",
+    "PORTFOLIO_SHEET_URL",
+    "portfolio_sheet_key",
+    "PORTFOLIO_SHEET_KEY",
+)
 
 # ---------------------------------------------------------------------------
 # Connection helpers
@@ -40,13 +50,49 @@ def _get_client() -> gspread.Client | None:
         return None
 
 
+def _extract_sheet_key(value: str) -> str | None:
+    """Extract Google Sheet key from a full URL or return key as-is."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", raw)
+    if m:
+        return m.group(1)
+
+    if re.fullmatch(r"[a-zA-Z0-9-_]{20,}", raw):
+        return raw
+
+    return None
+
+
+def _get_sheet_key() -> str:
+    """Get sheet key from secrets first, then fall back to config constant."""
+    for secret_key in _SHEET_URL_SECRET_KEYS:
+        try:
+            if secret_key in st.secrets:
+                extracted = _extract_sheet_key(str(st.secrets[secret_key]))
+                if extracted:
+                    return extracted
+                logger.warning(
+                    "Invalid Google Sheet value in st.secrets['%s']; falling back to config key.",
+                    secret_key,
+                )
+        except Exception:
+            continue
+    return PORTFOLIO_SHEET_KEY
+
+
 def _get_worksheet() -> gspread.Worksheet | None:
     client = _get_client()
     if client is None:
         return None
+    sheet_key = _get_sheet_key()
+    if not sheet_key:
+        return None
     try:
         try:
-            sh = client.open_by_key(PORTFOLIO_SHEET_KEY)
+            sh = client.open_by_key(sheet_key)
         except Exception:
             sh = client.open(PORTFOLIO_SHEET_NAME)
         if TRANSACTIONS_WORKSHEET:
@@ -69,7 +115,10 @@ def _read_public_sheet() -> list[list[Any]] | None:
     Returns a list-of-lists (header row first), or None on failure.
     """
     try:
-        base = f"https://docs.google.com/spreadsheets/d/{PORTFOLIO_SHEET_KEY}/gviz/tq?tqx=out:csv"
+        sheet_key = _get_sheet_key()
+        if not sheet_key:
+            return None
+        base = f"https://docs.google.com/spreadsheets/d/{sheet_key}/gviz/tq?tqx=out:csv"
         if TRANSACTIONS_WORKSHEET:
             url = f"{base}&sheet={TRANSACTIONS_WORKSHEET}"
         else:
