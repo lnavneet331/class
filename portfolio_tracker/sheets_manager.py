@@ -174,31 +174,6 @@ def _read_public_sheet() -> list[list[Any]] | None:
 
 
 # ---------------------------------------------------------------------------
-# Sample data (fallback when neither gspread nor public read is available)
-# ---------------------------------------------------------------------------
-
-# Google Finance export format: matches the actual sheet structure
-SAMPLE_TRANSACTIONS: list[list[Any]] = [
-    ["Symbol", "Current Price", "Date", "Time", "Change", "Open", "High", "Low",
-     "Volume", "Trade Date", "Purchase Price", "Quantity", "Commission",
-     "High Limit", "Low Limit", "Comment", "Transaction Type"],
-    ["$$CASH_TX", "", "", "", "", "", "", "", "", "20260410", "", "5000", "", "", "", "", "DEPOSIT"],
-    ["$$CASH_TX", "", "", "", "", "", "", "", "", "20260210", "", "83690", "", "", "", "", "DEPOSIT"],
-    ["HDFCBANK.NS", "", "", "", "", "", "", "", "", "20260330", "744.85", "10", "9", "", "", "", "BUY"],
-    ["NIFTYBEES.NS", "", "", "", "", "", "", "", "", "20260313", "263.25", "25", "2", "", "", "", "BUY"],
-    ["NIFTYBEES.NS", "", "", "", "", "", "", "", "", "20260309", "269.33", "25", "2", "", "", "", "BUY"],
-    ["INFY.NS", "", "", "", "", "", "", "", "", "20260216", "1340.9", "4", "15", "", "", "", "BUY"],
-    ["ADANIENT.NS", "", "", "", "", "", "", "", "", "20260123", "1905", "5", "", "", "", "", "BUY"],
-    ["KALYANKJIL.NS", "", "", "", "", "", "", "", "", "20260123", "370", "40", "", "", "", "", "BUY"],
-    ["KALYANKJIL.NS", "", "", "", "", "", "", "", "", "20260209", "437.35", "40", "40", "", "", "", "SELL"],
-    ["TATACAP.NS", "", "", "", "", "", "", "", "", "20260129", "331.5", "20", "", "", "", "", "BUY"],
-    ["WIPRO.NS", "", "", "", "", "", "", "", "", "20260212", "220", "23", "", "", "", "", "BUY"],
-    ["WIPRO.NS", "", "", "", "", "", "", "", "", "20260210", "233.47", "21", "", "", "", "", "BUY"],
-    ["GOLDBEES.NS", "", "", "", "", "", "", "", "", "20260130", "138.68", "72", "", "", "", "", "BUY"],
-    ["GOLDBEES.NS", "", "", "", "", "", "", "", "", "20260410", "123.68", "72", "8", "", "", "", "BUY"],
-]
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -213,7 +188,6 @@ def load_transactions() -> list[list[Any]]:
     Priority:
       1. Authenticated gspread (read + write)
       2. Public HTTP read from the hardcoded sheet key (read-only)
-      3. Built-in sample data
     """
     ws = _get_worksheet()
     if ws is not None:
@@ -226,7 +200,7 @@ def load_transactions() -> list[list[Any]]:
     if rows:
         return rows
 
-    return SAMPLE_TRANSACTIONS
+    return []
 
 
 def append_transaction(
